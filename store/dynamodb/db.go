@@ -21,7 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -107,8 +106,10 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 		return nil, err
 	}
 
+	fmt.Println("This is the region", config.Region)
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(os.Getenv("AWS_REGION"))},
+		// Region: aws.String(os.Getenv("AWS_REGION"))},
+		Region: aws.String(config.Region)},
 	)
 	if err != nil {
 		fmt.Println(err.Error())
