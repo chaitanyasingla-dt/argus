@@ -19,12 +19,15 @@ package dynamodb
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/go-playground/validator/v10"
 	"github.com/xmidt-org/argus/model"
 	"github.com/xmidt-org/argus/store"
@@ -103,6 +106,23 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String(os.Getenv("AWS_REGION"))},
+	)
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	value, err := sess.Config.Credentials.Get()
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	config.AccessKey = value.AccessKeyID
+	config.SecretKey = value.SecretAccessKey
 
 	awsConfig := *aws.NewConfig().
 		WithEndpoint(config.Endpoint).
