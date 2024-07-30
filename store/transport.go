@@ -117,7 +117,7 @@ func setItemRequestDecoder(config *transportConfig) kithttp.DecodeRequestFunc {
 		}
 
 		unmarshaler := validItemUnmarshaler{config: config, id: id}
-
+		fmt.Println("This is the request body", string(data))
 		if err := json.Unmarshal(data, &unmarshaler); err != nil {
 			var berr BadRequestErr
 			if ok := errors.As(err, &berr); !ok {
