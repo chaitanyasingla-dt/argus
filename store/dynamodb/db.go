@@ -124,6 +124,9 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 	config.AccessKey = value.AccessKeyID
 	config.SecretKey = value.SecretAccessKey
 
+	fmt.Println("This is the access keyID", value.AccessKeyID)
+	fmt.Println("This is the secret access key", value.SecretAccessKey)
+
 	awsConfig := *aws.NewConfig().
 		WithEndpoint(config.Endpoint).
 		WithUseDualStack(!config.DisableDualStack).
