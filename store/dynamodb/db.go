@@ -4,12 +4,15 @@ package dynamodb
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/go-playground/validator/v10"
 	"github.com/xmidt-org/argus/model"
 	"github.com/xmidt-org/argus/store"
@@ -60,10 +63,12 @@ type Config struct {
 	GetAllLimit int
 
 	// AccessKey is the AWS AccessKey credential.
-	AccessKey string `validate:"required"`
+	// AccessKey string `validate:"required"`
+	AccessKey string
 
 	// SecretKey is the AWS SecretKey credential.
-	SecretKey string `validate:"required"`
+	// SecretKey string `validate:"required"`
+	SecretKey string
 
 	// DisableDualStack indicates whether the connection to the DB should be
 	// dual stack (IPv4 and IPv6).
@@ -88,6 +93,42 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("This is the region", config.Region)
+	sess, err := session.NewSession(&aws.Config{
+		// Region: aws.String(os.Getenv("AWS_REGION"))},
+		Region: aws.String(config.Region)},
+	)
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	value, err := sess.Config.Credentials.Get()
+	if err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	}
+
+	config.AccessKey = value.AccessKeyID
+	config.SecretKey = value.SecretAccessKey
+
+	// Create IAM client
+	iamSvc := iam.New(sess)
+
+	// Get the attached policies
+	input := &iam.ListAttachedRolePoliciesInput{
+		RoleName: aws.String("ob-aws-service-role-for-dps"),
+	}
+
+	result, err := iamSvc.ListAttachedRolePolicies(input)
+	if err != nil {
+		fmt.Println("Error listing attached policies:", err)
+	}
+	fmt.Println("This is the attached policy", result)
+
+	fmt.Println("This is the access keyID", value.AccessKeyID)
+	fmt.Println("This is the secret access key", value.SecretAccessKey)
 
 	awsConfig := *aws.NewConfig().
 		WithEndpoint(config.Endpoint).
