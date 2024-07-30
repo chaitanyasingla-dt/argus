@@ -27,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/go-playground/validator/v10"
 	"github.com/xmidt-org/argus/model"
 	"github.com/xmidt-org/argus/store"
@@ -126,6 +127,20 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 
 	config.AccessKey = value.AccessKeyID
 	config.SecretKey = value.SecretAccessKey
+
+	// Create IAM client
+	iamSvc := iam.New(sess)
+
+	// Get the attached policies
+	input := &iam.ListAttachedRolePoliciesInput{
+		RoleName: aws.String("arn:aws:iam::921772479357:role/ob-aws-service-role-for-dps"),
+	}
+
+	result, err := iamSvc.ListAttachedRolePolicies(input)
+	if err != nil {
+		fmt.Println("Error listing attached policies:", err)
+	}
+	fmt.Println("This is the attached policy", result)
 
 	fmt.Println("This is the access keyID", value.AccessKeyID)
 	fmt.Println("This is the secret access key", value.SecretAccessKey)
