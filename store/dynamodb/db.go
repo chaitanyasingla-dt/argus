@@ -131,10 +131,12 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 	// Create IAM client
 	iamSvc := iam.New(sess)
 
-	arn := "arn:aws:iam::921772479357:role/ob-aws-service-role-for-dps"
-	result, err := iamSvc.GetPolicy(&iam.GetPolicyInput{
-		PolicyArn: &arn,
-	})
+	// Get the attached policies
+	input := &iam.ListAttachedRolePoliciesInput{
+		RoleName: aws.String("ob-aws-service-role-for-dps"),
+	}
+
+	result, err := iamSvc.ListAttachedRolePolicies(input)
 	if err != nil {
 		fmt.Println("Error listing attached policies:", err)
 	}
