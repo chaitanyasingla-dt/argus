@@ -26,8 +26,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/go-playground/validator/v10"
 	"github.com/xmidt-org/argus/model"
 	"github.com/xmidt-org/argus/store"
@@ -109,38 +109,56 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 		return nil, err
 	}
 
-	fmt.Println("This is the region", config.Region)
+	// fmt.Println("This is the region", config.Region)
+	// sess, err := session.NewSession(&aws.Config{
+	// 	// Region: aws.String(os.Getenv("AWS_REGION"))},
+	// 	Region: aws.String(config.Region)},
+	// )
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// 	return nil, err
+	// }
+
+	// value, err := sess.Config.Credentials.Get()
+	// if err != nil {
+	// 	fmt.Println(err.Error())
+	// 	return nil, err
+	// }
+
+	awsConfigCurrent := struct {
+		Region  string
+		RoleARN string
+	}{
+		Region:  "eu-central-1",
+		RoleARN: "arn:aws:iam::921772479357:role/ob-aws-service-role-for-dps",
+	}
+
 	sess, err := session.NewSession(&aws.Config{
-		// Region: aws.String(os.Getenv("AWS_REGION"))},
-		Region: aws.String(config.Region)},
+		Region: aws.String(awsConfigCurrent.Region)},
 	)
 	if err != nil {
 		fmt.Println(err.Error())
-		return nil, err
+	}
+
+	// Assume the role and create a new session with the assumed role's credentials.
+	creds := stscreds.NewCredentials(sess, awsConfigCurrent.RoleARN)
+
+	// Update the session with the new credentials.
+	sess, err = session.NewSession(&aws.Config{
+		Region:      aws.String(awsConfigCurrent.Region),
+		Credentials: creds,
+	})
+	if err != nil {
+		fmt.Println(err.Error())
 	}
 
 	value, err := sess.Config.Credentials.Get()
 	if err != nil {
 		fmt.Println(err.Error())
-		return nil, err
 	}
 
 	config.AccessKey = value.AccessKeyID
 	config.SecretKey = value.SecretAccessKey
-
-	// Create IAM client
-	iamSvc := iam.New(sess)
-
-	// Get the attached policies
-	input := &iam.ListAttachedRolePoliciesInput{
-		RoleName: aws.String("ob-aws-service-role-for-dps"),
-	}
-
-	result, err := iamSvc.ListAttachedRolePolicies(input)
-	if err != nil {
-		fmt.Println("Error listing attached policies:", err)
-	}
-	fmt.Println("This is the attached policy", result)
 
 	fmt.Println("This is the access keyID", value.AccessKeyID)
 	fmt.Println("This is the secret access key", value.SecretAccessKey)
