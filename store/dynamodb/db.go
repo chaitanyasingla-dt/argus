@@ -130,7 +130,7 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 		RoleARN string
 	}{
 		Region:  "eu-central-1",
-		RoleARN: "arn:aws:iam::921772479357:role/ob-aws-service-role-for-dps",
+		RoleARN: "arn:aws:iam::921772479357:role/ob-dev-ec1-shared-eks-node",
 	}
 
 	sess, err := session.NewSession(&aws.Config{
