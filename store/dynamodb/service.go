@@ -193,13 +193,13 @@ func (d *executor) Delete(key model.Key) (store.OwnableItem, *dynamodb.ConsumedC
 	return d.getOrDelete(key, true)
 }
 
-//TODO: For data >= 1MB, we'll need to handle pagination
+// TODO: For data >= 1MB, we'll need to handle pagination
 func (d *executor) GetAll(bucket string) (map[string]store.OwnableItem, *dynamodb.ConsumedCapacity, error) {
 	result := map[string]store.OwnableItem{}
 	now := strconv.Itoa(int(d.now().Unix()))
 	input := &dynamodb.QueryInput{
 		TableName: aws.String(d.tableName),
-		IndexName: aws.String("Expires-index"),
+		// IndexName: aws.String("Expires-index"),
 		KeyConditions: map[string]*dynamodb.Condition{
 			"bucket": {
 				ComparisonOperator: aws.String("EQ"),
