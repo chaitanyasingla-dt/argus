@@ -26,7 +26,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/go-playground/validator/v10"
 	"github.com/xmidt-org/argus/model"
@@ -109,59 +108,28 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 		return nil, err
 	}
 
-	// fmt.Println("This is the region", config.Region)
-	// sess, err := session.NewSession(&aws.Config{
-	// 	// Region: aws.String(os.Getenv("AWS_REGION"))},
-	// 	Region: aws.String(config.Region)},
-	// )
-	// if err != nil {
-	// 	fmt.Println(err.Error())
-	// 	return nil, err
-	// }
-
-	// value, err := sess.Config.Credentials.Get()
-	// if err != nil {
-	// 	fmt.Println(err.Error())
-	// 	return nil, err
-	// }
-
-	awsConfigCurrent := struct {
-		Region  string
-		RoleARN string
-	}{
-		Region:  "eu-central-1",
-		RoleARN: "arn:aws:iam::921772479357:role/ob-dev-ec1-shared-eks-node",
-	}
-
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(awsConfigCurrent.Region)},
+		Region: aws.String(config.Region)},
 	)
 	if err != nil {
 		fmt.Println(err.Error())
-	}
-
-	// Assume the role and create a new session with the assumed role's credentials.
-	creds := stscreds.NewCredentials(sess, awsConfigCurrent.RoleARN)
-
-	// Update the session with the new credentials.
-	sess, err = session.NewSession(&aws.Config{
-		Region:      aws.String(awsConfigCurrent.Region),
-		Credentials: creds,
-	})
-	if err != nil {
-		fmt.Println(err.Error())
+		return nil, err
 	}
 
 	value, err := sess.Config.Credentials.Get()
 	if err != nil {
 		fmt.Println(err.Error())
+		return nil, err
 	}
 
-	config.AccessKey = value.AccessKeyID
-	config.SecretKey = value.SecretAccessKey
-
-	fmt.Println("This is the access keyID", value.AccessKeyID)
-	fmt.Println("This is the secret access key", value.SecretAccessKey)
+	creds := credentials.Value{
+		AccessKeyID:     value.AccessKeyID,
+		SecretAccessKey: value.SecretAccessKey,
+		SessionToken:    value.SessionToken,
+	}
+	fmt.Println("This is the access key: ", value.AccessKeyID)
+	fmt.Println("This is the secret access key: ", value.SecretAccessKey)
+	fmt.Println("This is the session token: ", value.SessionToken)
 
 	awsConfig := *aws.NewConfig().
 		WithEndpoint(config.Endpoint).
@@ -169,10 +137,7 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 		WithMaxRetries(config.MaxRetries).
 		WithCredentialsChainVerboseErrors(true).
 		WithRegion(config.Region).
-		WithCredentials(credentials.NewStaticCredentialsFromCreds(credentials.Value{
-			AccessKeyID:     config.AccessKey,
-			SecretAccessKey: config.SecretKey,
-		}))
+		WithCredentials(credentials.NewStaticCredentialsFromCreds(creds))
 
 	svc, err := newService(awsConfig, "", config.Table, int64(config.GetAllLimit), &measures)
 	if err != nil {
