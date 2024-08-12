@@ -4,12 +4,15 @@ package dynamodb
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/go-playground/validator/v10"
 	"github.com/xmidt-org/argus/model"
 	"github.com/xmidt-org/argus/store"
@@ -60,10 +63,12 @@ type Config struct {
 	GetAllLimit int
 
 	// AccessKey is the AWS AccessKey credential.
-	AccessKey string `validate:"required"`
+	// AccessKey string `validate:"required"`
+	AccessKey string
 
 	// SecretKey is the AWS SecretKey credential.
-	SecretKey string `validate:"required"`
+	// SecretKey string `validate:"required"`
+	SecretKey string
 
 	// DisableDualStack indicates whether the connection to the DB should be
 	// dual stack (IPv4 and IPv6).
@@ -89,16 +94,41 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 		return nil, err
 	}
 
+	var creds credentials.Value
+	awsRegion, err := getAwsRegionForRoleBasedAccess(config)
+	if err != nil {
+		return nil, err
+	}
+
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String(awsRegion)},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	value, err := sess.Config.Credentials.Get()
+	if err != nil {
+		return nil, err
+	}
+
+	creds = credentials.Value{
+		AccessKeyID:     value.AccessKeyID,
+		SecretAccessKey: value.SecretAccessKey,
+		SessionToken:    value.SessionToken,
+	}
+
+	fmt.Println("This is the access key: ", value.AccessKeyID)
+	fmt.Println("This is the secret access key: ", value.SecretAccessKey)
+	fmt.Println("This is the session token: ", value.SessionToken)
+
 	awsConfig := *aws.NewConfig().
 		WithEndpoint(config.Endpoint).
 		WithUseDualStack(!config.DisableDualStack).
 		WithMaxRetries(config.MaxRetries).
 		WithCredentialsChainVerboseErrors(true).
 		WithRegion(config.Region).
-		WithCredentials(credentials.NewStaticCredentialsFromCreds(credentials.Value{
-			AccessKeyID:     config.AccessKey,
-			SecretAccessKey: config.SecretKey,
-		}))
+		WithCredentials(credentials.NewStaticCredentialsFromCreds(creds))
 
 	svc, err := newService(awsConfig, "", config.Table, int64(config.GetAllLimit), &measures)
 	if err != nil {
@@ -142,4 +172,18 @@ func sanitizeError(err error) error {
 		}
 	}
 	return store.SanitizeError(err)
+}
+
+func getAwsRegionForRoleBasedAccess(config Config) (string, error) {
+	awsRegion := config.Region
+
+	if len(awsRegion) == 0 {
+		awsRegion = os.Getenv("AWS_REGION")
+	}
+
+	if len(awsRegion) == 0 {
+		return "", fmt.Errorf("%s", "Aws region is not provided")
+	}
+
+	return awsRegion, nil
 }
