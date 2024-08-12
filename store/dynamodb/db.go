@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -108,25 +109,30 @@ func NewDynamoDB(config Config, measures metric.Measures) (store.S, error) {
 		return nil, err
 	}
 
+	var creds credentials.Value
+	awsRegion, err := getAwsRegionForRoleBasedAccess(config)
+	if err != nil {
+		return nil, err
+	}
+
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(config.Region)},
+		Region: aws.String(awsRegion)},
 	)
 	if err != nil {
-		fmt.Println(err.Error())
 		return nil, err
 	}
 
 	value, err := sess.Config.Credentials.Get()
 	if err != nil {
-		fmt.Println(err.Error())
 		return nil, err
 	}
 
-	creds := credentials.Value{
+	creds = credentials.Value{
 		AccessKeyID:     value.AccessKeyID,
 		SecretAccessKey: value.SecretAccessKey,
 		SessionToken:    value.SessionToken,
 	}
+
 	fmt.Println("This is the access key: ", value.AccessKeyID)
 	fmt.Println("This is the secret access key: ", value.SecretAccessKey)
 	fmt.Println("This is the session token: ", value.SessionToken)
@@ -181,4 +187,18 @@ func sanitizeError(err error) error {
 		}
 	}
 	return store.SanitizeError(err)
+}
+
+func getAwsRegionForRoleBasedAccess(config Config) (string, error) {
+	awsRegion := config.Region
+
+	if len(awsRegion) == 0 {
+		awsRegion = os.Getenv("AWS_REGION")
+	}
+
+	if len(awsRegion) == 0 {
+		return "", fmt.Errorf("%s", "Aws region is not provided")
+	}
+
+	return awsRegion, nil
 }
